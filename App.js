@@ -1,7 +1,12 @@
 import React, {Component} from 'react';
 import {StatusBar, Text, View} from "react-native";
 import * as SplashScreen from 'expo-splash-screen';
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import {
+  createDrawerNavigator,
+  DrawerContentScrollView,
+  DrawerItemList,
+  useDrawerStatus
+} from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import HomeScreen from "./src/screens/home.screen";
@@ -10,9 +15,17 @@ import store from './src/store';
 import {heightPercentageToDP as hp, widthPercentageToDP as wp} from "react-native-responsive-screen";
 import {Button} from "react-native-elements";
 import ContactScreen from "./src/screens/contact.screen";
-import Animated from "react-native-reanimated";
+import Animated, {
+  Extrapolate,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from "react-native-reanimated";
 import {AvatarRound} from "./src/composants/avatar-round";
 import {UPDATE_LOADING_VIEW} from "./src/actions/action-type";
+import useUpdateEffect from "./src/utils";
+import * as Font from 'expo-font';
 
 const APP_TITLE = "Example";
 
@@ -22,9 +35,23 @@ SplashScreen.preventAutoHideAsync()
 
 export default class App extends Component {
 
+  constructor(props) {
+    super(props);
+    this.state = {
+      fontsLoaded: false
+    }
+  }
+
+  fetchFonts = async () => await Font.loadAsync({
+    'EvilIcons': require('./node_modules/react-native-vector-icons/Fonts/EvilIcons.ttf'),
+    'FontAwesome': require('./node_modules/react-native-vector-icons/Fonts/FontAwesome.ttf'),
+    'Ionicons': require('./node_modules/react-native-vector-icons/Fonts/Ionicons.ttf'),
+  });
+
   componentDidMount() {
     setTimeout(async () => {
       store.dispatch({type: UPDATE_LOADING_VIEW, payload: false});
+      await this.fetchFonts();
       await SplashScreen.hideAsync();
     }, 2000);
   }
@@ -46,7 +73,7 @@ function HomeStack({navigation}) {
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="Home"
+        name="Home_Home"
         component={HomeScreen}
         options={{
           title: 'Accueil',
@@ -71,7 +98,7 @@ function NotificationStack({navigation}) {
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="Contact"
+        name="Contact_Home"
         component={ContactScreen}
         options={{
           title: 'Mes Contacts',
@@ -109,31 +136,13 @@ function MenuButton(props) {
   )
 }
 
-function CustomDrawerContent({ progress, ...rest }) {
-  const translateX = Animated.interpolate(progress, {
-    inputRange: [0, 1],
-    outputRange: [-100, 0],
-  });
-
-  return (
-    <DrawerContentScrollView {...rest}>
-      <View style={{flex: 1, alignItems: 'center', marginTop: hp(3), marginBottom: hp(3)}}>
-        <AvatarRound source={{uri: 'https://picsum.photos/id/536/200/200.jpg'}} size='large'/>
-        <Text style={{fontSize: 26, fontWeight: '700', marginTop: hp(3)}}>{APP_TITLE}</Text>
-      </View>
-      <Animated.View style={{transform: [{translateX}]}}>
-        <DrawerItemList {...rest} />
-      </Animated.View>
-    </DrawerContentScrollView>
-  );
-}
-
 function CustomDrawer() {
   return (
     <NavigationContainer>
       <Drawer.Navigator
         initialRouteName="Home"
-        drawerContentOptions={{
+        screenOptions={{
+          headerShown: false,
           activeBackgroundColor: 'darkgrey',
           activeTintColor: 'white',
           labelStyle: {
@@ -148,6 +157,39 @@ function CustomDrawer() {
         {/* TODO : Add new screens here */}
       </Drawer.Navigator>
     </NavigationContainer>
+  );
+}
+
+function CustomDrawerContent(props) {
+  const isDrawerOpen = useDrawerStatus();
+  const sv = useSharedValue(0);
+  useUpdateEffect(() => {
+    sv.value = isDrawerOpen === 'open' ? withTiming(1) : withTiming(0);
+  }, [isDrawerOpen]);
+
+  const screenStyle = useAnimatedStyle(() => {
+    const scaleY = interpolate(sv.value, [0, 0.5, 1], [1, 0.9, 0.8], {
+      extrapolateRight: Extrapolate.CLAMP,
+    });
+    const borderRadius = interpolate(sv.value, [0, 1], [1, 20], {
+      extrapolateRight: Extrapolate.CLAMP,
+    });
+    return {
+      transform: [{ scaleY }],
+      borderRadius
+    };
+  });
+
+  return (
+    <DrawerContentScrollView {...props}>
+      <View style={{flex: 1, alignItems: 'center', marginTop: hp(3), marginBottom: hp(3)}}>
+        <AvatarRound source={{uri: 'https://picsum.photos/id/536/200/200.jpg'}} size='large'/>
+        <Text style={{fontSize: 26, fontWeight: '700', marginTop: hp(3)}}>{APP_TITLE}</Text>
+      </View>
+      <Animated.View style={[screenStyle]}>
+        <DrawerItemList {...props} />
+      </Animated.View>
+    </DrawerContentScrollView>
   );
 }
 
