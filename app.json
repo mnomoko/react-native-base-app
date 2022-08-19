@@ -2,7 +2,6 @@
   "expo": {
     "name": "react-native-base-app",
     "slug": "react-native-base-app",
-    "sdkVersion": "39.0.0",
     "platforms": [
       "ios",
       "android"
